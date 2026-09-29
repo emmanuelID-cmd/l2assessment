@@ -11,7 +11,7 @@ Support teams waste time manually reading and triaging customer messages. This t
 ## Tech Stack
 
 - **Frontend**: React + Vite + Tailwind CSS
-- **AI**: Groq API (Llama 3.3 70B - Free tier)
+- **AI**: Groq API (`openai/gpt-oss-120b`)
 - **Runtime**: Browser-based (local development only)
 
 ## Setup Instructions
@@ -70,6 +70,24 @@ Support teams waste time manually reading and triaging customer messages. This t
 5. **History**: All analyses are saved to localStorage and viewable in the History tab
 
 
+## 🆕 Improvements Made
+
+After testing the original triage chatbot with multiple customer messages, three key issues were identified:
+
+1. **Limited triage categories** — the original classifier recognized a narrow set of intents, causing valid messages to fall into a generic category. The updated classifier uses explicit categories for billing, account access, technical support, outages, feature requests, product questions, feedback, cancellations/refunds, and clarification-needed cases.
+2. **No clarification handling** — vague or incomplete messages previously received generic responses. The updated classifier can identify missing details and ask a focused clarification question.
+3. **Static, unreliable responses** — replies were pulled from a small set of predetermined strings. The updated system uses Groq to generate context-aware responses within the classified support category, with safe fallback text when no API key is available or the request fails.
+
+### Implemented Improvement: AI-Generated Chat Responses
+
+The most impactful fix was replacing static canned replies with dynamic, context-aware responses generated through the Groq API. The chatbot now:
+
+- Responds to the details in each customer message rather than only matching a fixed template.
+- Uses validated triage classification as a grounding step before generating a response.
+- Supports category-specific follow-up questions in the Analyze view.
+- Redirects clearly unrelated questions instead of answering outside the supported support domains.
+- Falls back gracefully when no API key is configured.
+
 ## Example Test Messages
 
 Try analyzing these messages to see how the triage system works:
@@ -107,6 +125,22 @@ The dashboard won't load when I try to access it. I've tried refreshing but it k
 ## Security Note
 
 ⚠️ **Warning**: This application exposes the Groq API key in the browser (using `dangerouslyAllowBrowser: true`). This is acceptable for local development only but should **NEVER** be done in production. In a real application, API calls should be made from a secure backend server.
+
+### Deployment Note
+
+The Vercel deployment intentionally runs without a real Groq key. It can demonstrate the interface and fallback behavior, but live AI chat requires a local `.env.local` key. Adding a `VITE_` key to a public deployment would expose it in the browser bundle. The production-correct solution would be a backend or serverless proxy that stores the key server-side; that is outside this assignment's local-only constraint.
+
+## 🧪 Testing Evidence
+
+Test scenarios used during development include:
+
+- `Can you add a dark mode feature?` — classified as a feature request with product-focused guidance rather than billing advice.
+- `I am locked out of my account` — classified as account access, with account-recovery guidance rather than a generic product response.
+- `Our production server is down` — routed to service-outage support.
+- `I want a refund but I lost my receipt` — routed to cancellation/refund support with a request for safe, non-sensitive details.
+- Clearly unrelated questions — redirected to supported customer-support topics when fallback mode is active.
+
+The deployed Vercel version demonstrates the interface and fallback mode. Live AI responses are tested locally because the API key is intentionally not deployed.
 
 ## Why Groq?
 
