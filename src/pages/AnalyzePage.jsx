@@ -9,6 +9,9 @@ function AnalyzePage() {
   const [message, setMessage] = useState('')
   const [results, setResults] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [chatInput, setChatInput] = useState('')
+  const [chatMessages, setChatMessages] = useState([])
+  const [isChatLoading, setIsChatLoading] = useState(false)
 
   useEffect(() => {
     // Check for example message from home page
@@ -55,6 +58,7 @@ function AnalyzePage() {
       }
 
       setResults(analysisResult)
+      setChatMessages([])
 
       // Save to history
       const history = JSON.parse(localStorage.getItem('triageHistory') || '[]')
@@ -71,6 +75,25 @@ function AnalyzePage() {
   const handleClear = () => {
     setMessage('')
     setResults(null)
+    setChatInput('')
+    setChatMessages([])
+  }
+
+  const handleChatSubmit = async () => {
+    if (!results || !chatInput.trim() || isChatLoading) return
+
+    const question = chatInput.trim()
+    setChatInput('')
+    setChatMessages(current => [...current, { role: 'user', content: question }])
+    setIsChatLoading(true)
+
+    try {
+      const chatContext = `${results.message}\n\nFollow-up request within the ${results.category} category: ${question}`
+      const response = await generateCustomerResponse(chatContext, results, results.urgency)
+      setChatMessages(current => [...current, { role: 'assistant', content: response }])
+    } finally {
+      setIsChatLoading(false)
+    }
   }
 
   return (
@@ -157,13 +180,6 @@ function AnalyzePage() {
               </div>
 
               <div>
-                <div className="text-sm font-semibold text-gray-600 mb-1">Recommended Action</div>
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <p className="text-gray-800">{results.recommendedAction}</p>
-                </div>
-              </div>
-
-              <div>
                 <div className="text-sm font-semibold text-gray-600 mb-1">AI Reasoning</div>
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <div className="prose prose-sm max-w-none text-gray-700">
@@ -194,9 +210,53 @@ function AnalyzePage() {
               )}
 
               <div>
+                <div className="text-sm font-semibold text-gray-600 mb-1">Recommended Action</div>
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <p className="text-gray-800">{results.recommendedAction}</p>
+                </div>
+              </div>
+
+              <div>
                 <div className="text-sm font-semibold text-gray-600 mb-1">Suggested Customer Response</div>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-gray-800">
                   {results.customerResponse}
+                </div>
+              </div>
+
+              <div className="border-t border-gray-200 pt-4">
+                <div className="text-sm font-semibold text-gray-600 mb-1">Ask Relay AI a Follow-up</div>
+                <p className="text-sm text-gray-500 mb-3">
+                  Follow-up answers stay within the {results.category} support category.
+                </p>
+                {chatMessages.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {chatMessages.map((chatMessage, index) => (
+                      <div
+                        key={`${chatMessage.role}-${index}`}
+                        className={`rounded-lg p-3 text-sm ${chatMessage.role === 'user' ? 'bg-gray-100 text-gray-800' : 'bg-blue-50 text-gray-800'}`}
+                      >
+                        <div className="font-semibold mb-1">{chatMessage.role === 'user' ? 'You' : 'Relay AI'}</div>
+                        {chatMessage.content}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex space-x-2">
+                  <input
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleChatSubmit() }}
+                    placeholder="Ask a category-specific follow-up..."
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={isChatLoading}
+                  />
+                  <button
+                    onClick={handleChatSubmit}
+                    disabled={isChatLoading || !chatInput.trim()}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500"
+                  >
+                    {isChatLoading ? 'Thinking...' : 'Ask'}
+                  </button>
                 </div>
               </div>
             </div>
