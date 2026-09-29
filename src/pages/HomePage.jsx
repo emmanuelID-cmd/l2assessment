@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 
 function HomePage() {
+  const navigate = useNavigate()
   const [stats, setStats] = useState({ total: 0, today: 0 })
   const [recentActivity, setRecentActivity] = useState([])
 
@@ -82,7 +83,7 @@ function HomePage() {
               ]
               const random = examples[Math.floor(Math.random() * examples.length)]
               localStorage.setItem('exampleMessage', random)
-              window.location.href = '/analyze'
+              navigate('/analyze')
             }}
             className="bg-orange-600 text-white rounded-lg p-6 hover:bg-orange-700 transition"
           >
