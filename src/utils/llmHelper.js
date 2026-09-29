@@ -29,6 +29,9 @@ function parseClassification(content) {
 }
 
 export async function categorizeMessage(message) {
+  const lowerMessage = message.toLowerCase()
+  const accountAccessTerms = ['locked out', 'unable to access', "can't access", 'cannot access', 'account recovery', 'reset my password', 'forgot my password']
+  if (accountAccessTerms.some(term => lowerMessage.includes(term))) return getFallbackCategorization(message)
   if (!import.meta.env.VITE_GROQ_API_KEY) return getFallbackCategorization(message)
 
   try {
@@ -38,7 +41,7 @@ export async function categorizeMessage(message) {
       messages: [
         {
           role: 'system',
-          content: `You classify customer support messages. Return only valid JSON with these fields: category, confidence, evidence, reasoning, needsClarification, clarifyingQuestion. Choose exactly one category from this list and do not invent categories: ${JSON.stringify(CATEGORY_DEFINITIONS)}. Confidence must be a number from 0 to 1. Evidence must quote or paraphrase the relevant user intent. If the message is unclear or outside these support domains, use Other / Needs Clarification and ask one concise question.`
+          content: `You classify customer support messages. Return only valid JSON with these fields: category, confidence, evidence, reasoning, needsClarification, clarifyingQuestion. Choose exactly one category from this list and do not invent categories: ${JSON.stringify(CATEGORY_DEFINITIONS)}. Confidence must be a number from 0 to 1. Evidence must quote or paraphrase the relevant user intent. Account lockouts, login failures, password resets, and inability to access an account must be Account & Access, not Product Question. If the message is unclear or outside these support domains, use Other / Needs Clarification and ask one concise question.`
         },
         { role: 'user', content: message }
       ],
@@ -56,7 +59,7 @@ function getFallbackCategorization(message) {
   let category = 'Other / Needs Clarification'
   if (lowerMessage.includes('refund') || lowerMessage.includes('cancel') || lowerMessage.includes('close my account')) category = 'Cancellation & Refund'
   else if (lowerMessage.includes('payment') || lowerMessage.includes('bill') || lowerMessage.includes('charge') || lowerMessage.includes('invoice')) category = 'Billing & Payments'
-  else if (lowerMessage.includes('login') || lowerMessage.includes('sign in') || lowerMessage.includes('password') || lowerMessage.includes('access my account')) category = 'Account & Access'
+  else if (lowerMessage.includes('login') || lowerMessage.includes('sign in') || lowerMessage.includes('password') || lowerMessage.includes('access my account') || lowerMessage.includes('locked out') || lowerMessage.includes('unable to access') || lowerMessage.includes("can't access") || lowerMessage.includes('cannot access') || lowerMessage.includes('account recovery')) category = 'Account & Access'
   else if (lowerMessage.includes('outage') || lowerMessage.includes('server is down') || lowerMessage.includes('everyone')) category = 'Service Outage'
   else if (lowerMessage.includes('feature') || lowerMessage.includes('add ') || lowerMessage.includes('dark mode') || lowerMessage.includes('would like to see')) category = 'Feature Request'
   else if (lowerMessage.includes('bug') || lowerMessage.includes('error') || lowerMessage.includes('not working') || lowerMessage.includes('loading') || lowerMessage.includes('slow')) category = 'Technical Support'
