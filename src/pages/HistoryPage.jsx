@@ -145,12 +145,6 @@ function HistoryPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs font-semibold text-gray-600 mb-1">Recommended Action</div>
-                      <div className="text-sm text-gray-800 bg-purple-50 p-3 rounded border border-purple-200">
-                        {item.recommendedAction}
-                      </div>
-                    </div>
-                    <div>
                       <div className="text-xs font-semibold text-gray-600 mb-1">AI Reasoning</div>
                       <div className="bg-white p-3 rounded border border-gray-200">
                         <div className="prose prose-sm max-w-none text-gray-700">
@@ -173,6 +167,12 @@ function HistoryPage() {
                         Classification confidence: {Math.round(item.confidence * 100)}%
                       </div>
                     )}
+                    <div>
+                      <div className="text-xs font-semibold text-gray-600 mb-1">Recommended Action</div>
+                      <div className="text-sm text-gray-800 bg-purple-50 p-3 rounded border border-purple-200">
+                        {item.recommendedAction}
+                      </div>
+                    </div>
                     {item.customerResponse && (
                       <div>
                         <div className="text-xs font-semibold text-gray-600 mb-1">Suggested Customer Response</div>
