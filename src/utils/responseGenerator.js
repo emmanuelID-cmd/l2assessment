@@ -5,7 +5,9 @@ const groq = new Groq({ apiKey: import.meta.env.VITE_GROQ_API_KEY, dangerouslyAl
 
 export async function generateCustomerResponse(message, classification, urgency) {
   const { category, needsClarification, clarifyingQuestion } = classification
-  if (!import.meta.env.VITE_GROQ_API_KEY) return getFallbackResponse(classification, urgency)
+  if (!import.meta.env.VITE_GROQ_API_KEY || isClearlyOutOfDomain(message, category)) {
+    return getFallbackResponse(classification, urgency, isClearlyOutOfDomain(message, category))
+  }
 
   try {
     const response = await groq.chat.completions.create({
@@ -25,12 +27,20 @@ export async function generateCustomerResponse(message, classification, urgency)
     return response.choices[0].message.content.trim()
   } catch (error) {
     console.warn('Groq response generation failed, using local fallback:', error.message)
-    return getFallbackResponse(classification, urgency)
+    return getFallbackResponse(classification, urgency, isClearlyOutOfDomain(message, category))
   }
 }
 
-function getFallbackResponse(classification, urgency) {
+function isClearlyOutOfDomain(message, category) {
+  if (category !== 'Product Question' && category !== 'Other / Needs Clarification') return false
+  const supportedTerms = ['account', 'billing', 'bill', 'payment', 'charge', 'invoice', 'subscription', 'refund', 'cancel', 'login', 'sign in', 'password', 'access', 'error', 'bug', 'broken', 'issue', 'problem', 'loading', 'outage', 'server', 'feature', 'product', 'app', 'dashboard', 'email', 'storage', 'message', 'customer', 'support']
+  const lowerMessage = message.toLowerCase()
+  return !supportedTerms.some(term => lowerMessage.includes(term))
+}
+
+function getFallbackResponse(classification, urgency, outOfDomain = false) {
   const { category, clarifyingQuestion } = classification
+  if (outOfDomain) return 'I can help with supported customer-support topics such as billing, account access, technical issues, outages, product questions, and feature requests. Please provide a question related to one of those areas.'
   if (category === 'Other / Needs Clarification') return clarifyingQuestion || 'Could you provide the product area, what you expected to happen, and what happened instead?'
   if (category === 'Feature Request') return 'Thanks for the suggestion. We will share it with the product team for consideration. Please tell us how you would use this feature and which details matter most.'
   if (category === 'Technical Support' || category === 'Service Outage') return `Thanks for reporting this. Please share the steps that led to the issue, the exact error message, and the browser and device you are using.${urgency === 'High' ? ' Please also include the business impact so the support team can prioritize it.' : ''}`
