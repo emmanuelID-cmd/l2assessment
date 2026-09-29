@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import { categorizeMessage } from '../utils/llmHelper'
 import { calculateUrgency } from '../utils/urgencyScorer'
 import { getRecommendedAction } from '../utils/templates'
+import { generateCustomerResponse } from '../utils/responseGenerator'
 
 function AnalyzePage() {
   const [message, setMessage] = useState('')
@@ -29,19 +30,26 @@ function AnalyzePage() {
     
     try {
       // Run categorization (LLM call)
-      const { category, reasoning } = await categorizeMessage(message)
+      const classification = await categorizeMessage(message)
+      const { category, reasoning, confidence, evidence, needsClarification, clarifyingQuestion } = classification
       
       // Calculate urgency (rule-based)
       const urgency = calculateUrgency(message)
       
       // Get recommended action (template-based)
       const recommendedAction = getRecommendedAction(category)
+      const customerResponse = await generateCustomerResponse(message, classification, urgency)
       
       const analysisResult = {
         message,
         category,
+        confidence,
+        evidence,
+        needsClarification,
+        clarifyingQuestion,
         urgency,
         recommendedAction,
+        customerResponse,
         reasoning,
         timestamp: new Date().toISOString()
       }
@@ -165,12 +173,38 @@ function AnalyzePage() {
                   </div>
                 </div>
               </div>
+
+              <div>
+                <div className="text-sm font-semibold text-gray-600 mb-1">Evidence</div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700">
+                  {results.evidence}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-semibold text-gray-600 mb-1">Confidence</div>
+                <div className="text-gray-700">{Math.round(results.confidence * 100)}%</div>
+              </div>
+
+              {results.needsClarification && results.clarifyingQuestion && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-900">
+                  <div className="text-sm font-semibold mb-1">Clarification Needed</div>
+                  {results.clarifyingQuestion}
+                </div>
+              )}
+
+              <div>
+                <div className="text-sm font-semibold text-gray-600 mb-1">Suggested Customer Response</div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-gray-800">
+                  {results.customerResponse}
+                </div>
+              </div>
             </div>
 
             <div className="mt-6 pt-4 border-t border-gray-200">
               <button
                 onClick={() => {
-                  const text = `Category: ${results.category}\nUrgency: ${results.urgency}\nRecommendation: ${results.recommendedAction}\n\nReasoning: ${results.reasoning}`
+                  const text = `Category: ${results.category}\nUrgency: ${results.urgency}\nRecommendation: ${results.recommendedAction}\n\nSuggested Customer Response: ${results.customerResponse}\n\nReasoning: ${results.reasoning}`
                   navigator.clipboard.writeText(text)
                   alert('Results copied to clipboard!')
                 }}

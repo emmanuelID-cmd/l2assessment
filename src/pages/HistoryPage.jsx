@@ -160,6 +160,27 @@ function HistoryPage() {
                         </div>
                       </div>
                     </div>
+                    {item.evidence && (
+                      <div>
+                        <div className="text-xs font-semibold text-gray-600 mb-1">Evidence</div>
+                        <div className="text-sm text-gray-800 bg-white p-3 rounded border border-gray-200">
+                          {item.evidence}
+                        </div>
+                      </div>
+                    )}
+                    {typeof item.confidence === 'number' && (
+                      <div className="text-sm text-gray-600">
+                        Classification confidence: {Math.round(item.confidence * 100)}%
+                      </div>
+                    )}
+                    {item.customerResponse && (
+                      <div>
+                        <div className="text-xs font-semibold text-gray-600 mb-1">Suggested Customer Response</div>
+                        <div className="text-sm text-gray-800 bg-blue-50 p-3 rounded border border-blue-200">
+                          {item.customerResponse}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

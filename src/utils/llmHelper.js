@@ -1,165 +1,74 @@
-import Groq from 'groq-sdk';
+import Groq from 'groq-sdk'
 
-/**
- * LLM Helper for categorizing customer support messages
- * Using Groq API for AI-powered categorization
- */
+export const CATEGORY_DEFINITIONS = {
+  'Billing & Payments': 'Charges, invoices, payment failures, payment methods, or subscription billing.',
+  'Account & Access': 'Login, account access, permissions, password, or account settings problems.',
+  'Technical Support': 'A product bug, error, broken feature, loading problem, or unexpected behavior.',
+  'Service Outage': 'A broad outage, downtime, unavailable service, or issue affecting many users.',
+  'Feature Request': 'A request for new functionality, an enhancement, or a product improvement.',
+  'Product Question': 'A question about how an existing product feature or service works.',
+  'Feedback & Praise': 'Positive feedback, criticism, or comments that do not ask for a new feature or support fix.',
+  'Cancellation & Refund': 'A request to cancel a service, close an account, or receive a refund.',
+  'Other / Needs Clarification': 'The message is unclear, incomplete, or outside the supported support domains.'
+}
 
-// Initialize Groq client
-const groq = new Groq({
-  apiKey: import.meta.env.VITE_GROQ_API_KEY,
-  dangerouslyAllowBrowser: true // Required for browser-based calls (not recommended for production!)
-});
+const categories = Object.keys(CATEGORY_DEFINITIONS)
+const groq = new Groq({ apiKey: import.meta.env.VITE_GROQ_API_KEY, dangerouslyAllowBrowser: true })
 
-/**
- * Categorize a customer support message using Groq AI
- * 
- * @param {string} message - The customer support message
- * @returns {Promise<{category: string, reasoning: string}>}
- */
-export async function categorizeMessage(message) {
-  try {
-    const response = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        {
-          role: "user",
-          content: `Categorize this customer support message: ${message}`
-        }
-      ],
-      temperature: 0.7,
-    });
-
-    const content = response.choices[0].message.content;
-    
-    const lines = content.split('\n');
-    let category = "Unknown";
-    let reasoning = content;
-    
-    if (content.toLowerCase().includes('billing')) {
-      category = "Billing Issue";
-    } else if (content.toLowerCase().includes('technical') || content.toLowerCase().includes('bug')) {
-      category = "Technical Problem";
-    } else if (content.toLowerCase().includes('feature')) {
-      category = "Feature Request";
-    } else if (content.toLowerCase().includes('inquiry') || content.toLowerCase().includes('question')) {
-      category = "General Inquiry";
-    }
-    
-    return {
-      category,
-      reasoning: content
-    };
-  } catch (error) {
-    console.warn('Groq API failed, using mock response:', error.message);
-    return getMockCategorization(message);
+function parseClassification(content) {
+  const parsed = JSON.parse(content)
+  const category = categories.includes(parsed.category) ? parsed.category : 'Other / Needs Clarification'
+  return {
+    category,
+    confidence: Math.min(1, Math.max(0, Number(parsed.confidence) || 0)),
+    evidence: typeof parsed.evidence === 'string' ? parsed.evidence : 'The message needs more detail to identify the relevant support domain.',
+    reasoning: typeof parsed.reasoning === 'string' ? parsed.reasoning : 'The message was classified using its stated intent and available details.',
+    needsClarification: Boolean(parsed.needsClarification) || category === 'Other / Needs Clarification',
+    clarifyingQuestion: typeof parsed.clarifyingQuestion === 'string' ? parsed.clarifyingQuestion : ''
   }
 }
 
-/**
- * Mock categorization for when API is unavailable
- */
-function getMockCategorization(message) {
-  const lowerMessage = message.toLowerCase();
-  
-  // Array of possible reasoning variations for each category
-  const reasoningVariations = {
-    billing: [
-      "Based on keywords related to payments and billing, this appears to be a billing-related inquiry. The customer may need assistance with account charges or payment issues.",
-      "This message contains billing terminology. The customer is likely experiencing issues with payments, invoices, or account charges.",
-      "The message references financial matters related to the customer's account. This suggests a billing or payment concern that requires attention.",
-    ],
-    technical: [
-      "This message describes technical difficulties or system errors. The customer is reporting functionality issues that may require engineering review.",
-      "Based on error-related keywords, this appears to be a technical support issue. The customer is experiencing problems with product functionality.",
-      "The message indicates a technical problem or bug. This requires investigation from the technical support team.",
-      "System-related issues are mentioned in this message. The customer needs technical assistance to resolve functionality problems.",
-    ],
-    feature: [
-      "This message suggests improvements or new functionality. The customer is providing product feedback and feature suggestions.",
-      "The customer is requesting enhancements to the product. This appears to be a feature request that should be reviewed by the product team.",
-      "Based on the language used, this seems to be a suggestion for product improvements rather than a support issue.",
-    ],
-    inquiry: [
-      "This appears to be a general question about the product or service. The customer is seeking information or clarification.",
-      "The message contains questions that don't indicate a specific problem. This is likely a general inquiry requiring informational support.",
-      "Based on the question format, this seems to be an information request rather than a technical or billing issue.",
-    ],
-    positive: [
-      "This message contains positive sentiment and appreciation. While not a support request, it may warrant acknowledgment.",
-      "The customer is expressing satisfaction or gratitude. This doesn't appear to require immediate support action.",
-    ],
-    ambiguous: [
-      "The message content is unclear or doesn't match standard support categories. Manual review may be needed for proper categorization.",
-      "This message doesn't contain clear indicators for automatic categorization. Human review recommended.",
-    ]
-  };
-  
-  // Helper to get random reasoning
-  const getRandomReasoning = (category) => {
-    const reasons = reasoningVariations[category];
-    return reasons[Math.floor(Math.random() * reasons.length)];
-  };
-  
-  // Billing-related detection
-  if (lowerMessage.includes('bill') || lowerMessage.includes('payment') || 
-      lowerMessage.includes('charge') || lowerMessage.includes('invoice') ||
-      lowerMessage.includes('credit card') || lowerMessage.includes('subscription') ||
-      lowerMessage.includes('refund') || lowerMessage.includes('cancel') && lowerMessage.includes('account')) {
-    return {
-      category: "Billing Issue",
-      reasoning: getRandomReasoning('billing')
-    };
+export async function categorizeMessage(message) {
+  if (!import.meta.env.VITE_GROQ_API_KEY) return getFallbackCategorization(message)
+
+  try {
+    const response = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content: `You classify customer support messages. Return only valid JSON with these fields: category, confidence, evidence, reasoning, needsClarification, clarifyingQuestion. Choose exactly one category from this list and do not invent categories: ${JSON.stringify(CATEGORY_DEFINITIONS)}. Confidence must be a number from 0 to 1. Evidence must quote or paraphrase the relevant user intent. If the message is unclear or outside these support domains, use Other / Needs Clarification and ask one concise question.`
+        },
+        { role: 'user', content: message }
+      ],
+      temperature: 0.2
+    })
+    return parseClassification(response.choices[0].message.content)
+  } catch (error) {
+    console.warn('Groq classification failed, using local fallback:', error.message)
+    return getFallbackCategorization(message)
   }
-  
-  // Technical problem detection
-  if (lowerMessage.includes('bug') || lowerMessage.includes('error') || 
-      lowerMessage.includes('broken') || lowerMessage.includes('not working') ||
-      lowerMessage.includes('crash') || lowerMessage.includes('down') || 
-      lowerMessage.includes('server') || lowerMessage.includes('loading') ||
-      lowerMessage.includes('slow') || lowerMessage.includes('issue') ||
-      lowerMessage.includes('problem') && !lowerMessage.includes('no problem')) {
-    return {
-      category: "Technical Problem",
-      reasoning: getRandomReasoning('technical')
-    };
-  }
-  
-  // Feature request detection
-  if (lowerMessage.includes('feature') || lowerMessage.includes('add') && (lowerMessage.includes('please') || lowerMessage.includes('could')) ||
-      lowerMessage.includes('improve') || lowerMessage.includes('would like to see') ||
-      lowerMessage.includes('suggestion') || lowerMessage.includes('wish') ||
-      lowerMessage.includes('could you') && lowerMessage.includes('add') ||
-      lowerMessage.includes('enhancement') || lowerMessage.includes('would be great')) {
-    return {
-      category: "Feature Request",
-      reasoning: getRandomReasoning('feature')
-    };
-  }
-  
-  // Positive feedback detection
-  if ((lowerMessage.includes('thank') || lowerMessage.includes('thanks') || lowerMessage.includes('appreciate')) &&
-      !lowerMessage.includes('but') && !lowerMessage.includes('however')) {
-    return {
-      category: "General Inquiry",
-      reasoning: getRandomReasoning('positive')
-    };
-  }
-  
-  // Question/inquiry detection
-  if (lowerMessage.includes('how') || lowerMessage.includes('what') || 
-      lowerMessage.includes('when') || lowerMessage.includes('where') ||
-      lowerMessage.includes('can i') || lowerMessage.includes('is there') ||
-      lowerMessage.includes('?')) {
-    return {
-      category: "General Inquiry",
-      reasoning: getRandomReasoning('inquiry')
-    };
-  }
-  
-  // Fallback for ambiguous messages
+}
+
+function getFallbackCategorization(message) {
+  const lowerMessage = message.toLowerCase()
+  let category = 'Other / Needs Clarification'
+  if (lowerMessage.includes('refund') || lowerMessage.includes('cancel') || lowerMessage.includes('close my account')) category = 'Cancellation & Refund'
+  else if (lowerMessage.includes('payment') || lowerMessage.includes('bill') || lowerMessage.includes('charge') || lowerMessage.includes('invoice')) category = 'Billing & Payments'
+  else if (lowerMessage.includes('login') || lowerMessage.includes('sign in') || lowerMessage.includes('password') || lowerMessage.includes('access my account')) category = 'Account & Access'
+  else if (lowerMessage.includes('outage') || lowerMessage.includes('server is down') || lowerMessage.includes('everyone')) category = 'Service Outage'
+  else if (lowerMessage.includes('feature') || lowerMessage.includes('add ') || lowerMessage.includes('dark mode') || lowerMessage.includes('would like to see')) category = 'Feature Request'
+  else if (lowerMessage.includes('bug') || lowerMessage.includes('error') || lowerMessage.includes('not working') || lowerMessage.includes('loading') || lowerMessage.includes('slow')) category = 'Technical Support'
+  else if (lowerMessage.includes('how ') || lowerMessage.includes('what ') || lowerMessage.includes('can i') || lowerMessage.includes('?')) category = 'Product Question'
+  else if (lowerMessage.includes('thank') || lowerMessage.includes('great') || lowerMessage.includes('love')) category = 'Feedback & Praise'
+
   return {
-    category: "General Inquiry",
-    reasoning: getRandomReasoning('ambiguous')
-  };
+    category,
+    confidence: category === 'Other / Needs Clarification' ? 0.25 : 0.6,
+    evidence: category === 'Other / Needs Clarification' ? 'No supported intent was clear from the message.' : `The message contains language associated with ${category}.`,
+    reasoning: category === 'Other / Needs Clarification' ? 'There is not enough information to safely route this message.' : `The message was matched to ${category} using its stated intent.`,
+    needsClarification: category === 'Other / Needs Clarification',
+    clarifyingQuestion: category === 'Other / Needs Clarification' ? 'What product area are you contacting us about, and what outcome do you need?' : ''
+  }
 }
