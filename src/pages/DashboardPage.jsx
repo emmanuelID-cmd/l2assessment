@@ -1,12 +1,17 @@
 import { useState } from 'react'
+import HistoryStatus from '../components/HistoryStatus'
+import { readHistory } from '../utils/historyStore'
+import { buildUrgencyInsights } from '../utils/dashboardInsights'
 
 function getDashboardData() {
-  const history = JSON.parse(localStorage.getItem('triageHistory') || '[]')
+  const historyStatus = readHistory()
+  const history = historyStatus.records
   const today = new Date().toDateString()
   const todayMessages = history.filter(item => new Date(item.timestamp).toDateString() === today)
   const highUrgency = history.filter(item => item.urgency === 'High').length
   const categories = {}
-  history.forEach(item => {
+  const classifiedHistory = history.filter(item => !item.needsCategoryReview)
+  classifiedHistory.forEach(item => {
     categories[item.category] = (categories[item.category] || 0) + 1
   })
   const urgency = { High: 0, Medium: 0, Low: 0 }
@@ -22,16 +27,20 @@ function getDashboardData() {
       avgPerDay: Math.round(history.length / (history.length > 0 ? 7 : 1))
     },
     categoryData: Object.entries(categories).map(([name, count]) => ({ name, count })),
-    urgencyData: urgency
+    classifiedTotal: classifiedHistory.length,
+    urgencyData: urgency,
+    insights: buildUrgencyInsights(history),
+    historyStatus
   }
 }
 
 function DashboardPage() {
-  const [{ stats, categoryData, urgencyData }] = useState(getDashboardData)
+  const [{ stats, categoryData, classifiedTotal, urgencyData, insights, historyStatus }] = useState(getDashboardData)
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4">
+        <HistoryStatus {...historyStatus} />
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600">Overview of message triage analytics</p>
@@ -61,12 +70,13 @@ function DashboardPage() {
           {/* Category Distribution */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Category Distribution</h2>
+            <p className="text-sm text-gray-600 mb-4">Based on {classifiedTotal} tickets without a category review flag.</p>
             {categoryData.length === 0 ? (
               <div className="text-center text-gray-500 py-8">No data yet</div>
             ) : (
               <div className="space-y-3">
                 {categoryData.map((cat) => {
-                  const percentage = stats.total > 0 ? (cat.count / stats.total) * 100 : 0
+                  const percentage = classifiedTotal > 0 ? (cat.count / classifiedTotal) * 100 : 0
                   return (
                     <div key={cat.name}>
                       <div className="flex justify-between text-sm mb-1">
@@ -120,20 +130,32 @@ function DashboardPage() {
         </div>
 
         {/* Insights Section */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-6">
-          <h2 className="text-lg font-bold text-blue-900 mb-2">💡 Insights</h2>
-          <div className="space-y-2 text-sm text-blue-800">
-            {stats.highUrgencyPercent > 30 && (
-              <p>⚠️ High urgency messages represent {stats.highUrgencyPercent}% of total volume - consider additional support resources</p>
-            )}
-            {stats.today > 10 && (
-              <p>📈 High activity today with {stats.today} messages analyzed</p>
-            )}
-            {stats.total === 0 && (
-              <p>👋 Start by analyzing some messages to see insights here</p>
-            )}
-          </div>
-        </div>
+        <section className="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-6" aria-labelledby="insights-title">
+          <h2 id="insights-title" className="text-lg font-bold text-blue-900 mb-2">Insights by urgency</h2>
+          <p className="text-sm text-blue-800 mb-4">Closed tickets grouped by urgency and category, with a brief summary of the issues in each group. Tickets needing category review are counted separately.</p>
+          {stats.total === 0 ? (
+            <p className="text-sm text-blue-800">Close a case to see insights here.</p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-3">
+              {insights.map(band => (
+                <section key={band.urgency} className="rounded-lg border border-blue-200 bg-white p-4" aria-label={`${band.urgency} urgency insights`}>
+                  <h3 className="font-bold text-gray-900">{band.urgency} urgency <span className="text-gray-600 font-normal">({band.total})</span></h3>
+                  {band.total === 0 ? <p className="mt-2 text-sm text-gray-600">No tickets in this band.</p> : (
+                    <div className="mt-3 space-y-3">
+                      {band.categories.map(category => (
+                        <div key={category.name} className="border-t border-gray-100 pt-2">
+                          <p className="text-sm font-semibold text-gray-900">{category.count} {category.name}</p>
+                          <p className="text-sm text-gray-600">{category.summary}</p>
+                        </div>
+                      ))}
+                      {band.pendingReview > 0 && <p className="border-t border-gray-100 pt-2 text-sm text-yellow-900">{band.pendingReview} awaiting category review</p>}
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )

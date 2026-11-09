@@ -1,8 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
+import HistoryStatus from '../components/HistoryStatus'
+import { readHistory } from '../utils/historyStore'
 
 function getHomeData() {
-  const history = JSON.parse(localStorage.getItem('triageHistory') || '[]')
+  const historyStatus = readHistory()
+  const history = historyStatus.records
   const today = new Date().toDateString()
   const todayCount = history.filter(item =>
     new Date(item.timestamp).toDateString() === today
@@ -10,17 +13,19 @@ function getHomeData() {
 
   return {
     stats: { total: history.length, today: todayCount },
-    recentActivity: history.slice(-3).reverse()
+    recentActivity: history.slice(-3).reverse(),
+    historyStatus
   }
 }
 
 function HomePage() {
   const navigate = useNavigate()
-  const [{ stats, recentActivity }] = useState(getHomeData)
+  const [{ stats, recentActivity, historyStatus }] = useState(getHomeData)
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
+        <HistoryStatus {...historyStatus} />
         {/* Hero Section */}
         <div className="bg-white rounded-lg shadow-md p-8 mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-3">
