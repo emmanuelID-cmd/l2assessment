@@ -63,11 +63,20 @@ Support teams waste time manually reading and triaging customer messages. This t
 1. **Paste Message**: User pastes a customer support message into the text area
 2. **Analyze**: Click "Analyze Message" to process the input
 3. **Classification**: The app runs three processes in parallel:
-   - **Category Classification** (LLM): Uses Groq AI (Llama 3.3 70B) to categorize the message
+   - **Category Classification**: Uses category rules first and Groq AI (`openai/gpt-oss-120b`) for less clear cases when a local key is available
    - **Urgency Scoring** (Rule-based): Applies simple rules to determine urgency
    - **Recommendation** (Template-based): Maps category to a recommended action
-4. **Display Results**: Shows category, urgency tag, recommended action, and AI reasoning
-5. **History**: All analyses are saved to localStorage and viewable in the History tab
+4. **Draft Analysis**: Shows a provisional category, urgency, recommended action, and reasoning. Follow-ups may clarify the issue and update that provisional category.
+5. **Close Case**: Closing reviews the conversation, including troubleshooting discussed, and saves one final ticket to browser localStorage with the original message, initial response, and every follow-up turn in order. If the final category differs from the initial one, History shows the correction and its recorded reason. Without a local Groq key, closeout uses the provisional category derived from customer follow-ups.
+6. **History**: Closed tickets are viewable in the History tab. The app does not route them to a real support queue.
+
+Dashboard Insights groups closed tickets into High, Medium, and Low urgency bands, then shows category counts and a brief plain-language summary of the common issues in each group. A closeout review can save a short issue label based on the conversation; older records use keyword-based labels to form the summary. Tickets awaiting category review are counted separately so their uncertain labels do not distort the category breakdown.
+
+### Saved history and export
+
+History belongs to the browser and site origin where a case was closed; this project has no shared database. Open the History tab and choose **Export raw JSON** to download the original `triageHistory` value before clearing records. The app reads older records without rewriting them, recognizes the former `Billing Issue` and `Technical Problem` labels for display, and flags ambiguous older labels for review. If saved data is malformed, the app warns you and keeps the original value in browser storage rather than silently replacing it. To restore an export, open the same site's browser developer tools, select Application > Local Storage, paste the file's exact contents into `triageHistory`, and refresh the page. An export of malformed data may not itself be valid JSON, but preserves the original text for recovery. Exported files can contain customer messages, so review and protect them before sharing.
+
+The classifier, recommendations, and History use one category list. Current synthetic classification cases are in `sample-messages.json`; they include account lockouts, outages, feature requests, mixed requests, and unrelated questions. A saved ticket with a likely category mismatch keeps its saved category and shows **Needs staff review** as a separate status; it is excluded from the dashboard's category distribution until reviewed. History is read-only for category changes. Closed tickets show their saved conversation when follow-ups were recorded. Tickets whose category changed during the conversation show the initial and final categories, recorded reason, and previous response. Older tickets saved before conversation history was included cannot display follow-ups that were never stored. This browser-only project has no staff sign-in or backend routing, so it cannot securely offer staff-only editing or route a ticket after closeout.
 
 
 ## 🆕 Improvements Made
@@ -85,8 +94,9 @@ The most impactful fix was replacing static canned replies with dynamic, context
 - Responds to the details in each customer message rather than only matching a fixed template.
 - Uses validated triage classification as a grounding step before generating a response.
 - Supports category-specific follow-up questions in the Analyze view.
+- Sends the original ticket and recent follow-up turns in order so later questions can refer to earlier answers. After the most recent 12 prior messages, older follow-ups roll out of the AI context; the chat remains open and shows a recap reminder.
 - Redirects clearly unrelated questions instead of answering outside the supported support domains.
-- Falls back gracefully when no API key is configured.
+- Uses a category-specific fallback for the initial response when no API key is configured. Live follow-ups require a local Groq key; if that call fails, the app keeps the question and shows an error instead of repeating a canned answer.
 
 ## Example Test Messages
 
