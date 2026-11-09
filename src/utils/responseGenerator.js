@@ -1,5 +1,6 @@
 import Groq from 'groq-sdk'
-import { CATEGORY_DEFINITIONS } from './llmHelper'
+import { CATEGORY_DEFINITIONS } from './categories'
+import { buildFollowUpMessages } from './followUpContext'
 
 const groq = new Groq({ apiKey: import.meta.env.VITE_GROQ_API_KEY, dangerouslyAllowBrowser: true })
 
@@ -28,6 +29,26 @@ export async function generateCustomerResponse(message, classification, urgency)
   } catch (error) {
     console.warn('Groq response generation failed, using local fallback:', error.message)
     return getFallbackResponse(classification, urgency, isClearlyOutOfDomain(message, category))
+  }
+}
+
+export async function generateFollowUpResponse({ originalMessage, initialResponse, classification, urgency, turns, question }) {
+  if (!import.meta.env.VITE_GROQ_API_KEY) {
+    throw new Error('Live follow-up requires a local Groq API key. Add it to .env.local and retry.')
+  }
+
+  try {
+    const response = await groq.chat.completions.create({
+      model: 'openai/gpt-oss-120b',
+      messages: buildFollowUpMessages({ originalMessage, initialResponse, category: classification.category, urgency, turns, question }),
+      temperature: 0.3
+    })
+    const content = response.choices[0]?.message?.content?.trim()
+    if (!content) throw new Error('The AI returned an empty response.')
+    return content
+  } catch (error) {
+    console.warn('Groq follow-up generation failed:', error.message)
+    throw new Error('Live follow-up is unavailable. Check your local Groq key or model access, then retry.')
   }
 }
 

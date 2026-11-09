@@ -1,3 +1,5 @@
+import { CATEGORY_NAMES } from './categories.js'
+
 /**
  * Recommendation Templates - Maps categories to recommended actions
  */
@@ -31,7 +33,7 @@ export function getRecommendedAction(category) {
  * @returns {string[]} - List of categories
  */
 export function getAvailableCategories() {
-  return Object.keys(actionTemplates)
+  return CATEGORY_NAMES
 }
 
 /**

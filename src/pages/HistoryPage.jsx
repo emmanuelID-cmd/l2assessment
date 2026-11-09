@@ -1,15 +1,24 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import HistoryStatus from '../components/HistoryStatus'
+import { HISTORY_KEY, readHistory } from '../utils/historyStore'
 
 function HistoryPage() {
-  const [history, setHistory] = useState(() => JSON.parse(localStorage.getItem('triageHistory') || '[]'))
+  const [historyStatus, setHistoryStatus] = useState(readHistory)
+  const history = historyStatus.records
   const [filter, setFilter] = useState('all')
   const [expandedIndex, setExpandedIndex] = useState(null)
+  const [clearError, setClearError] = useState('')
 
   const clearHistory = () => {
     if (window.confirm('Are you sure you want to clear all history?')) {
-      localStorage.setItem('triageHistory', '[]')
-      setHistory([])
+      try {
+        localStorage.setItem(HISTORY_KEY, '[]')
+        setHistoryStatus(readHistory())
+        setClearError('')
+      } catch {
+        setClearError('History could not be cleared. Export your data and check browser storage settings.')
+      }
     }
   }
 
@@ -26,6 +35,8 @@ function HistoryPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
+        <HistoryStatus {...historyStatus} showExport />
+        {clearError && <div role="alert" className="mb-6 rounded-lg border border-red-300 bg-red-50 p-4 text-red-900">{clearError}</div>}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -76,7 +87,7 @@ function HistoryPage() {
         {filteredHistory.length === 0 && (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
             <div className="text-5xl mb-4">📭</div>
-            <div className="text-xl text-gray-600 mb-2">No history yet</div>
+            <div className="text-xl text-gray-600 mb-2">{historyStatus.issues.length > 0 ? 'No readable history to display' : 'No history yet'}</div>
             <p className="text-gray-500 mb-6">
               Analyzed messages will appear here
             </p>
@@ -90,14 +101,23 @@ function HistoryPage() {
         )}
 
         <div className="space-y-4">
-          {filteredHistory.map((item, index) => (
+          {filteredHistory.map(item => (
             <div
-              key={index}
+              key={item.storageIndex}
               className="bg-white rounded-lg shadow-md overflow-hidden"
             >
               <div
-                className="p-4 cursor-pointer hover:bg-gray-50"
-                onClick={() => setExpandedIndex(expandedIndex === index ? null : index)}
+                role="button"
+                tabIndex={0}
+                aria-expanded={expandedIndex === item.storageIndex}
+                className="p-4 cursor-pointer hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
+                onClick={() => setExpandedIndex(expandedIndex === item.storageIndex ? null : item.storageIndex)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setExpandedIndex(expandedIndex === item.storageIndex ? null : item.storageIndex)
+                  }
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -111,6 +131,8 @@ function HistoryPage() {
                       <span className="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold">
                         {item.category}
                       </span>
+                      {item.needsCategoryReview && <span className="text-xs bg-yellow-100 text-yellow-900 px-3 py-1 rounded-full font-semibold">Needs staff review</span>}
+                      {item.categoryCorrections?.length > 0 && <span className="text-xs bg-green-100 text-green-900 px-3 py-1 rounded-full font-semibold">Category corrected</span>}
                       <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
                         item.urgency === 'High' ? 'bg-red-200 text-red-900' :
                         item.urgency === 'Medium' ? 'bg-yellow-200 text-yellow-900' :
@@ -121,12 +143,12 @@ function HistoryPage() {
                     </div>
                   </div>
                   <div className="text-gray-400 ml-4">
-                    {expandedIndex === index ? '▲' : '▼'}
+                    {expandedIndex === item.storageIndex ? '▲' : '▼'}
                   </div>
                 </div>
               </div>
 
-              {expandedIndex === index && (
+              {expandedIndex === item.storageIndex && (
                 <div className="border-t border-gray-200 p-4 bg-gray-50">
                   <div className="space-y-3">
                     <div>
@@ -135,8 +157,32 @@ function HistoryPage() {
                         {item.message}
                       </div>
                     </div>
+                    {item.followUpTurns?.length > 0 && (
+                      <div>
+                        <div className="text-xs font-semibold text-gray-600 mb-1">Conversation</div>
+                        <div className="space-y-2">
+                          {item.initialCustomerResponse && (
+                            <div className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-gray-800">
+                              <div className="font-semibold mb-1">Relay AI · initial response</div>
+                              {item.initialCustomerResponse}
+                            </div>
+                          )}
+                          {item.followUpTurns.map((turn, index) => (
+                            <div key={index} className={`rounded border p-3 text-sm text-gray-800 ${turn.role === 'user' ? 'border-gray-200 bg-white' : 'border-blue-200 bg-blue-50'}`}>
+                              <div className="font-semibold mb-1">{turn.role === 'user' ? 'Customer' : 'Relay AI'} · {turn.role === 'user' ? 'follow-up' : 'response'}</div>
+                              {turn.content}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {item.needsCategoryReview && (
+                      <p className="rounded border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
+                        This category may be inaccurate and needs staff review. The saved ticket has not been changed.
+                      </p>
+                    )}
                     <div>
-                      <div className="text-xs font-semibold text-gray-600 mb-1">AI Reasoning</div>
+                      <div className="text-xs font-semibold text-gray-600 mb-1">{item.needsCategoryReview ? 'Previous AI Reasoning (unverified)' : item.categoryCorrections?.length ? 'Review note' : 'AI Reasoning'}</div>
                       <div className="bg-white p-3 rounded border border-gray-200">
                         <div className="prose prose-sm max-w-none text-gray-700">
                           <ReactMarkdown>
@@ -147,7 +193,7 @@ function HistoryPage() {
                     </div>
                     {item.evidence && (
                       <div>
-                        <div className="text-xs font-semibold text-gray-600 mb-1">Evidence</div>
+                        <div className="text-xs font-semibold text-gray-600 mb-1">{item.needsCategoryReview ? 'Previous Evidence (unverified)' : item.categoryCorrections?.length ? 'Review basis' : 'Evidence'}</div>
                         <div className="text-sm text-gray-800 bg-white p-3 rounded border border-gray-200">
                           {item.evidence}
                         </div>
@@ -155,21 +201,31 @@ function HistoryPage() {
                     )}
                     {typeof item.confidence === 'number' && (
                       <div className="text-sm text-gray-600">
-                        Classification confidence: {Math.round(item.confidence * 100)}%
+                        {item.needsCategoryReview ? 'Previous classification confidence' : 'Classification confidence'}: {Math.round(item.confidence * 100)}%
                       </div>
                     )}
                     <div>
-                      <div className="text-xs font-semibold text-gray-600 mb-1">Recommended Action</div>
+                      <div className="text-xs font-semibold text-gray-600 mb-1">{item.needsCategoryReview ? 'Previous Recommended Action (unverified)' : 'Recommended Action'}</div>
                       <div className="text-sm text-gray-800 bg-purple-50 p-3 rounded border border-purple-200">
                         {item.recommendedAction}
                       </div>
                     </div>
                     {item.customerResponse && (
                       <div>
-                        <div className="text-xs font-semibold text-gray-600 mb-1">Suggested Customer Response</div>
+                        <div className="text-xs font-semibold text-gray-600 mb-1">{item.needsCategoryReview ? 'Previous Suggested Response (unverified)' : 'Suggested Customer Response'}</div>
                         <div className="text-sm text-gray-800 bg-blue-50 p-3 rounded border border-blue-200">
                           {item.customerResponse}
                         </div>
+                      </div>
+                    )}
+                    {item.categoryCorrections?.length > 0 && (
+                      <div className="rounded border border-gray-200 bg-white p-3 text-sm text-gray-700">
+                        <div className="font-semibold">Category corrected</div>
+                        <div>Changed from {item.categoryCorrections.at(-1).previousCategory} to {item.category}.</div>
+                        <div>Reason recorded: {item.categoryCorrections.at(-1).reason || item.evidence || 'The original customer message was reviewed; no further reason was saved.'}</div>
+                        <div className="mt-2 font-semibold">Previous classification and response</div>
+                        {item.categoryCorrections.at(-1).previousRecommendedAction && <div>Action: {item.categoryCorrections.at(-1).previousRecommendedAction}</div>}
+                        {item.categoryCorrections.at(-1).previousCustomerResponse && <div>Response: {item.categoryCorrections.at(-1).previousCustomerResponse}</div>}
                       </div>
                     )}
                   </div>

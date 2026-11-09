@@ -2,11 +2,11 @@
 
 ## Overview
 
-The Customer Inbox Triage app is a lightweight AI-powered tool that helps classify customer support messages and recommend actions. It uses Groq AI to categorize messages, applies rule-based urgency scoring, and suggests next steps based on predefined templates.
+The Customer Inbox Triage app helps classify customer support messages and recommend actions. It uses category rules first, Groq AI for less clear cases when a local key is available, rule-based urgency scoring, and category-specific recommendations.
 
 ## Problem Statement
 
-Support teams waste time manually reading and triaging customer messages. This tool provides an automated first pass at classification to help prioritize and route messages more efficiently.
+Support teams waste time manually reading and triaging customer messages. This tool provides an automated first pass at classification to help prioritize cases; it does not route tickets to a real support queue.
 
 ## Tech Stack
 
@@ -18,16 +18,16 @@ Support teams waste time manually reading and triaging customer messages. This t
 
 ### Prerequisites
 
-- Node.js (v16 or higher)
+- Node.js 20.19+ or 22.12+ (required by the installed Vite version)
 - npm or yarn
-- Groq API key (FREE - get from https://console.groq.com)
+- Groq API key for live AI responses (get one from https://console.groq.com)
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd "L2 assessment"
+   git clone https://github.com/emmanuelID-cmd/l2assessment.git
+   cd l2assessment
    ```
 
 2. **Install dependencies**
@@ -41,6 +41,8 @@ Support teams waste time manually reading and triaging customer messages. This t
    ```bash
    cp .env.example .env.local
    ```
+
+   In PowerShell, use `Copy-Item .env.example .env.local` instead. If PowerShell blocks `npm.ps1`, run `npm.cmd install` and `npm.cmd run dev`.
    
    Edit `.env.local` and add your Groq API key:
    ```
@@ -49,7 +51,7 @@ Support teams waste time manually reading and triaging customer messages. This t
    
    Get your FREE API key from: https://console.groq.com/keys
    
-   **Why Groq?** Groq offers a generous free tier with fast inference and no credit card required!
+   The app can run without a key, but live follow-up responses require one. Keep the key only in `.env.local` for local development.
 
 4. **Run the application**
    ```bash
@@ -62,12 +64,25 @@ Support teams waste time manually reading and triaging customer messages. This t
 
 1. **Paste Message**: User pastes a customer support message into the text area
 2. **Analyze**: Click "Analyze Message" to process the input
-3. **Classification**: The app runs three processes in parallel:
-   - **Category Classification** (LLM): Uses Groq AI (Llama 3.3 70B) to categorize the message
+3. **Classification and guidance**: The app combines these steps:
+   - **Category Classification**: Uses category rules first and Groq AI (`openai/gpt-oss-120b`) for less clear cases when a local key is available
    - **Urgency Scoring** (Rule-based): Applies simple rules to determine urgency
    - **Recommendation** (Template-based): Maps category to a recommended action
-4. **Display Results**: Shows category, urgency tag, recommended action, and AI reasoning
-5. **History**: All analyses are saved to localStorage and viewable in the History tab
+4. **Draft Analysis**: Shows a provisional category, urgency, recommended action, and reasoning. Follow-ups may clarify the issue and update that provisional category.
+5. **Close Case**: Closing reviews the conversation, including troubleshooting discussed, and saves one final ticket to browser localStorage with the original message, initial response, and every follow-up turn in order. If the final category differs from the initial one, History shows the correction and its recorded reason. Without a local Groq key, closeout uses the provisional category derived from customer follow-ups.
+6. **History**: Closed tickets are viewable in the History tab. The app does not route them to a real support queue.
+
+Dashboard analytics count closed tickets, identified by their closeout timestamp. Earlier analyses without a closeout timestamp remain in History but are excluded from closed-case counts. Insights groups closed tickets into High, Medium, and Low urgency bands, then shows category counts and a brief plain-language summary of the common issues in each group. A closeout review can save a short issue label based on the conversation; older closed records use keyword-based labels to form the summary. Tickets awaiting category review are counted separately so their uncertain labels do not distort the category breakdown.
+
+### Saved history and export
+
+History belongs to the browser and site origin where a case was closed; this project has no shared database. Open the History tab and choose **Export raw JSON** to download the original `triageHistory` value before clearing records. The app reads older records without rewriting them, recognizes the former `Billing Issue` and `Technical Problem` labels for display, and flags ambiguous older labels for review. If saved data is malformed, the app warns you and keeps the original value in browser storage rather than silently replacing it. To restore an export, open the same site's browser developer tools, select Application > Local Storage, paste the file's exact contents into `triageHistory`, and refresh the page. An export of malformed data may not itself be valid JSON, but preserves the original text for recovery. Exported files can contain customer messages, so review and protect them before sharing.
+
+The classifier, recommendations, and History use one category list. Current synthetic classification cases are in `sample-messages.json`; they include account lockouts, outages, feature requests, mixed requests, and unrelated questions. A saved ticket with a likely category mismatch keeps its saved category and shows **Needs staff review** as a separate status; it is excluded from the dashboard's category distribution until reviewed. History is read-only for category changes. Closed tickets show their saved conversation when follow-ups were recorded. Tickets whose category changed during the conversation show the initial and final categories, recorded reason, and previous response. Older tickets saved before conversation history was included cannot display follow-ups that were never stored. This browser-only project has no staff sign-in or backend routing, so it cannot securely offer staff-only editing or route a ticket after closeout.
+
+### Local history cleanup
+
+A three-record browser-history export was audited separately from the repository. All categories and required field types were valid, so no category or customer message was changed. A cleaned JSON copy corrected 10 guidance fields: the profile-verification action, the meeting case's explanation and reply, and the vacation case's action and clarification state. The original export was preserved. One record is a closed case; two are earlier analyses without closeout timestamps or recoverable follow-up turns. The Dashboard now excludes those earlier analyses from closed-case totals. The cleaned copy is **not** imported into browser storage or committed to this repository; use the restore steps above only after reviewing the copy.
 
 
 ## 🆕 Improvements Made
@@ -85,8 +100,9 @@ The most impactful fix was replacing static canned replies with dynamic, context
 - Responds to the details in each customer message rather than only matching a fixed template.
 - Uses validated triage classification as a grounding step before generating a response.
 - Supports category-specific follow-up questions in the Analyze view.
+- Sends the original ticket and recent follow-up turns in order so later questions can refer to earlier answers. After the most recent 12 prior messages, older follow-ups roll out of the AI context; the chat remains open and shows a recap reminder.
 - Redirects clearly unrelated questions instead of answering outside the supported support domains.
-- Falls back gracefully when no API key is configured.
+- Uses a category-specific fallback for the initial response when no API key is configured. Live follow-ups require a local Groq key; if that call fails, the app keeps the question and shows an error instead of repeating a canned answer.
 
 ## Example Test Messages
 
@@ -136,19 +152,18 @@ Test scenarios used during development include:
 
 - `Can you add a dark mode feature?` — classified as a feature request with product-focused guidance rather than billing advice.
 - `I am locked out of my account` — classified as account access, with account-recovery guidance rather than a generic product response.
-- `Our production server is down` — routed to service-outage support.
-- `I want a refund but I lost my receipt` — routed to cancellation/refund support with a request for safe, non-sensitive details.
+- `Our production server is down` — classified as a service-outage case.
+- `I want a refund but I lost my receipt` — classified as a cancellation/refund case with a request for safe, non-sensitive details.
 - Clearly unrelated questions — redirected to supported customer-support topics when fallback mode is active.
 
 The deployed Vercel version demonstrates the interface and fallback mode. Live AI responses are tested locally because the API key is intentionally not deployed.
 
+Local checks: `node --test src/utils/*.test.js` (24 passing), `npm run lint`, and `npm run build`.
+
 ## Why Groq?
 
-- ✅ **Completely Free** - No credit card required
-- ✅ **Fast Inference** - Groq's LPU technology is incredibly fast
-- ✅ **Generous Limits** - ~14,400 requests/day on free tier
-- ✅ **High Quality** - Llama 3.3 70B performs excellently
-- ✅ **Easy Signup** - Get started in minutes at https://console.groq.com
+- The app uses Groq for local, context-aware replies with the `openai/gpt-oss-120b` model.
+- Account setup and current usage limits are available at https://console.groq.com.
 
 ## License
 
