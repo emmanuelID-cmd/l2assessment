@@ -1,77 +1,21 @@
 {
   "testMessages": [
-    {
-      "id": 1,
-      "title": "Production Emergency (Incorrectly marked Low)",
-      "message": "Database connection lost",
-      "expectedIssues": [
-        "Should be High urgency but marked as Low (too short)",
-        "Critical issue not recognized"
-      ]
-    },
-    {
-      "id": 2,
-      "title": "Friendly Thank You (Incorrectly marked High)",
-      "message": "Thank you so much! Your team has been incredibly helpful and I really appreciate the fast response to my question earlier today!",
-      "expectedIssues": [
-        "Should be Low urgency but marked as High (contains '!')",
-        "Not an actual support issue"
-      ]
-    },
-    {
-      "id": 3,
-      "title": "Feature Request (Wrong Template)",
-      "message": "Could you add an export to CSV feature? Would be really useful for my monthly reports.",
-      "expectedIssues": [
-        "Recommended action will be 'Ask user to check billing portal'",
-        "Wrong template for feature requests"
-      ]
-    },
-    {
-      "id": 4,
-      "title": "Billing + Technical Hybrid (Ambiguous)",
-      "message": "My payment failed and now I can't access the dashboard. Is there a bug or do I need to update my credit card?",
-      "expectedIssues": [
-        "Category unclear - could be Billing or Technical",
-        "May produce inconsistent results on repeated analysis"
-      ]
-    },
-    {
-      "id": 5,
-      "title": "Minimal Input (No Validation)",
-      "message": "hi",
-      "expectedIssues": [
-        "No validation prevents submission",
-        "Poor quality results expected",
-        "Automatically marked as Low urgency"
-      ]
-    },
-    {
-      "id": 6,
-      "title": "Urgent Short Message",
-      "message": "Server down now",
-      "expectedIssues": [
-        "Marked as Low urgency due to short length",
-        "Actually very urgent"
-      ]
-    },
-    {
-      "id": 7,
-      "title": "Long Rambling Non-Urgent",
-      "message": "Hi! I was just browsing through your website and noticed you have a really nice design! I especially like the color scheme and the way you've organized the navigation menu! Everything looks so professional and clean! Just wanted to share my positive feedback!",
-      "expectedIssues": [
-        "Marked as High urgency due to multiple '!'",
-        "Actually not urgent at all - just positive feedback"
-      ]
-    },
-    {
-      "id": 8,
-      "title": "General Inquiry",
-      "message": "What are your business hours?",
-      "expectedIssues": [
-        "Short message marked as Low urgency",
-        "Simple question with generic response"
-      ]
-    }
+    { "id": 1, "message": "I am locked out of my account", "expectedCategory": "Account & Access" },
+    { "id": 2, "message": "Can you add a dark mode feature?", "expectedCategory": "Feature Request" },
+    { "id": 3, "message": "Server down now", "expectedCategory": "Service Outage" },
+    { "id": 4, "message": "Database connection lost", "expectedCategory": "Technical Support" },
+    { "id": 5, "message": "Thank you for your great service!", "expectedCategory": "Feedback & Praise" },
+    { "id": 6, "message": "My payment failed and now I can't log in", "expectedCategory": "Other / Needs Clarification" },
+    { "id": 7, "message": "Can I update my payment method?", "expectedCategory": "Billing & Payments" },
+    { "id": 8, "message": "I want a refund but I lost my receipt", "expectedCategory": "Cancellation & Refund" },
+    { "id": 9, "message": "What are your business hours?", "expectedCategory": "Product Question" },
+    { "id": 10, "message": "Who won the world series?", "expectedCategory": "Other / Needs Clarification" },
+    { "id": 11, "message": "How do I delete old Gmail emails?", "expectedCategory": "Other / Needs Clarification" },
+    { "id": 12, "message": "The dashboard is not working", "expectedCategory": "Technical Support" },
+    { "id": 13, "message": "Could you add an export to CSV feature?", "expectedCategory": "Feature Request" },
+    { "id": 14, "message": "I tried to update my payment method but the page keeps loading forever", "expectedCategory": "Billing & Payments" },
+    { "id": 15, "message": "The site is down and all users see a loading error", "expectedCategory": "Service Outage" },
+    { "id": 16, "message": "I am locked out and the login page shows an error", "expectedCategory": "Account & Access" },
+    { "id": 17, "message": "What is your favorite movie?", "expectedCategory": "Other / Needs Clarification" }
   ]
 }
