@@ -5,7 +5,8 @@ import { buildUrgencyInsights } from '../utils/dashboardInsights'
 
 function getDashboardData() {
   const historyStatus = readHistory()
-  const history = historyStatus.records
+  const history = historyStatus.records.filter(item => item.closedAt)
+  const legacyCount = historyStatus.records.length - history.length
   const today = new Date().toDateString()
   const todayMessages = history.filter(item => new Date(item.timestamp).toDateString() === today)
   const highUrgency = history.filter(item => item.urgency === 'High').length
@@ -30,12 +31,13 @@ function getDashboardData() {
     classifiedTotal: classifiedHistory.length,
     urgencyData: urgency,
     insights: buildUrgencyInsights(history),
+    legacyCount,
     historyStatus
   }
 }
 
 function DashboardPage() {
-  const [{ stats, categoryData, classifiedTotal, urgencyData, insights, historyStatus }] = useState(getDashboardData)
+  const [{ stats, categoryData, classifiedTotal, urgencyData, insights, legacyCount, historyStatus }] = useState(getDashboardData)
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -43,13 +45,14 @@ function DashboardPage() {
         <HistoryStatus {...historyStatus} />
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600">Overview of message triage analytics</p>
+          <p className="text-gray-600">Overview of closed case analytics</p>
+          {legacyCount > 0 && <p className="mt-2 text-sm text-gray-600">{legacyCount} earlier {legacyCount === 1 ? 'analysis remains' : 'analyses remain'} in History and {legacyCount === 1 ? 'is' : 'are'} excluded from closed case counts.</p>}
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm text-gray-600 mb-1">Total Messages</div>
+            <div className="text-sm text-gray-600 mb-1">Closed Cases</div>
             <div className="text-3xl font-bold text-blue-600">{stats.total}</div>
           </div>
           <div className="bg-white rounded-lg shadow p-6">

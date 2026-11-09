@@ -21,6 +21,14 @@ test('empty and current history are readable', () => {
   assert.deepEqual(result.issues, [])
 })
 
+test('closeout timestamps distinguish closed tickets from older analyses', () => {
+  const closedAt = '2026-09-29T13:00:00.000Z'
+  const result = parseHistory(JSON.stringify([base, { ...base, closedAt }]))
+  assert.equal(result.records[0].closedAt, undefined)
+  assert.equal(result.records[1].closedAt, closedAt)
+  assert.deepEqual(result.issues, [])
+})
+
 test('malformed JSON and non-list history are reported without rewriting raw data', () => {
   for (const raw of ['{broken', '{}']) {
     const result = parseHistory(raw)

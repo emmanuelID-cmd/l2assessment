@@ -63,6 +63,10 @@ export function parseHistory(raw) {
       urgency: entry.urgency,
       timestamp: entry.timestamp
     }
+    if (entry.closedAt !== undefined) {
+      if (typeof entry.closedAt === 'string' && !Number.isNaN(Date.parse(entry.closedAt))) record.closedAt = entry.closedAt
+      else issues.push(`${label} has an invalid closeout timestamp; it remains in History but is excluded from closed-case analytics.`)
+    }
     if (category !== entry.category) record.originalCategory = entry.category
     if (reviewed) record.categoryCorrections = entry.categoryCorrections.filter(correction =>
       correction && typeof correction === 'object' && typeof correction.previousCategory === 'string'
