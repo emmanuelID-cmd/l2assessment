@@ -4,6 +4,21 @@
 
 The Customer Inbox Triage app helps classify customer support messages and recommend actions. It uses category rules first, Groq AI for less clear cases when a local key is available, rule-based urgency scoring, and category-specific recommendations.
 
+## UPDATED since September 29, 2026
+
+The November 9, 2026 update added the following changes to the earlier chatbot work:
+
+| Area | What changed |
+| --- | --- |
+| Classification data | Replaced 8 issue-description samples with 17 messages that have expected categories. Category rules and recommended actions now use the same category list. |
+| Follow-up context | Later questions include the original message and recent conversation in order. The AI receives up to 12 prior follow-up messages; a recap reminder appears when older turns leave that context. |
+| Ticket lifecycle | Analysis now starts as a draft. Closing a case saves one ticket with its final category and records why the category changed, if applicable. |
+| History | Saved records are validated before display. Known legacy labels are recognized, uncertain categories are flagged for review, and the original browser data can be exported. Newly closed tickets retain the initial reply and every follow-up turn. Category changes are shown as read-only history. |
+| Dashboard | Insights now group closed cases by urgency and category with brief issue summaries. Earlier analyses without a closeout timestamp remain in History but do not count as closed cases. |
+| Local data audit | A separate three-record browser export was checked and a cleaned copy corrected 10 guidance fields. No category or customer message changed. The cleaned copy remains outside Git and has **not** replaced browser storage. |
+
+The sections below explain setup, case behavior, history recovery, and testing in more detail.
+
 ## Problem Statement
 
 Support teams waste time manually reading and triaging customer messages. This tool provides an automated first pass at classification to help prioritize cases; it does not route tickets to a real support queue.
